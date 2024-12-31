@@ -68,9 +68,9 @@ const executeDefaultStrategy = async (
     throw new Error('Error changing directory, server may be misconfigured');
   }
   const { stdout: branchOut } = await exec(`git rev-parse --abbrev-ref HEAD`);
-  if (branchOut !== branch) {
+  if (branchOut.trim().toLowerCase() !== branch.trim().toLowerCase()) {
     console.log('Branch mismatch, skipping update');
-    console.log('Receieved: ', branchOut, ' Expected: ', branch);
+    console.log(`Receieved: ${branchOut}. Expected: ${branch}`);
     throw new Error('Branch mismatch, server may be misconfigured');
   }
   const { stderr: pullError } = await exec(`git pull`);

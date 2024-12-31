@@ -10,7 +10,7 @@ This application is originally designed for the usecase of hosting several appli
 
 To use this app you should you simply need it running on the target server, setup a webhook on the repo to target application and finally to configure the Code Cast application to listen for the given repo.
 
-Obviously the Code Cast application must have appropriate permissions to build and copy the files needed for said process.
+Obviously the Code Cast application must have appropriate permissions to build and copy the files needed.
 
 ## Config
 

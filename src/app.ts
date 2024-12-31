@@ -1,10 +1,14 @@
 import 'dotenv/config';
+import { promisify } from 'node:util';
+import child_process from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FastifyPluginAsync, FastifyReply } from 'fastify';
 import sensible from '@fastify/sensible';
 import rateLimit from '@fastify/rate-limit';
 import { PushEventPayload, UpdateConfig, UpdateListener } from './types';
+
+const exec = promisify(child_process.exec);
 
 const app: FastifyPluginAsync = async (fastify): Promise<void> => {
   fastify.register(sensible);
@@ -27,7 +31,7 @@ const app: FastifyPluginAsync = async (fastify): Promise<void> => {
     if (event === 'ping') {
       return reply.status(200).send();
     }
-    const payload = (request.body as PushEventPayload) ?? {};
+    const payload = request.body as PushEventPayload;
     if (!payload.repository?.name) {
       console.error('Repository name is missing in the payload.', payload);
       return reply.status(400).send();
@@ -42,16 +46,54 @@ const app: FastifyPluginAsync = async (fastify): Promise<void> => {
       );
       return reply.status(400).send();
     }
-    return update(listener, payload, reply);
+    if (!filter(listener, payload)) {
+      return forbidden(reply);
+    }
+    console.log('All filters passed, updating application:');
+    if (listener.strategy.type === 'default') {
+      console.log('Using default strategy');
+      return executeDefaultStrategy(listener.branch!, listener.dist);
+    }
+    return reply.status(501).send();
   });
 };
 
-const update = (
-  listener: UpdateListener,
-  payload: PushEventPayload,
-  reply: FastifyReply
+const executeDefaultStrategy = async (
+  branch: string,
+  distConfig: { in: string; out: string }
 ) => {
-  console.log('Updating application:', listener, payload);
+  const { stderr: cdError } = await exec(`cd ${distConfig.in}/..`);
+  if (cdError) {
+    console.error('Error changing directory:', cdError);
+    throw new Error('Error changing directory, server may be misconfigured');
+  }
+  const { stdout: branchOut } = await exec(`git rev-parse --abbrev-ref HEAD`);
+  if (branchOut !== branch) {
+    console.log('Branch mismatch, skipping update');
+    console.log('Receieved: ', branchOut, ' Expected: ', branch);
+    throw new Error('Branch mismatch, server may be misconfigured');
+  }
+  const { stderr: pullError } = await exec(`git pull`);
+  if (pullError) {
+    console.error('Error pulling from remote:', pullError);
+    throw new Error('Error pulling from remote, server may be misconfigured');
+  }
+  const { stderr: buildError } = await exec(`npm run build`);
+  if (buildError) {
+    console.error('Error building application:', buildError);
+    throw new Error('Error building application, server may be misconfigured');
+  }
+  const { stderr: mvError } = await exec(
+    `mv ${distConfig.in}/* ${distConfig.out}`
+  );
+  if (mvError) {
+    console.error('Error moving files:', mvError);
+    throw new Error('Error moving files, server may be misconfigured');
+  }
+};
+
+const filter = (listener: UpdateListener, payload: PushEventPayload) => {
+  console.log('Found eligible repo for update', listener);
   if (listener.filters) {
     const { username, email, name } = listener.filters;
     if (
@@ -60,12 +102,12 @@ const update = (
       (name && name !== payload.pusher?.name)
     ) {
       console.log('Pusher is not allowed:', payload.pusher);
-      return forbidden(reply);
+      return false;
     }
   }
-  if (listener.branch && listener.branch !== payload.ref?.split('/').pop()) {
+  if (!listener.branch || listener.branch !== payload.ref?.split('/').pop()) {
     console.log('Branch is not allowed:', payload.ref);
-    return forbidden(reply);
+    return false;
   }
   if (
     listener.commitFlag &&
@@ -74,8 +116,9 @@ const update = (
     )
   ) {
     console.log('Commit flag not found:', listener.commitFlag);
-    return forbidden(reply);
+    return false;
   }
+  return true;
 };
 
 const retrieveConfig = () => {

@@ -54,6 +54,7 @@ const retrieveConfig = () => {
   try {
     const dir = process.env.CC_CONFIG_DIR ?? '/etc/code-cast';
     const path = join(dir, 'config.json');
+    console.log('Reading configuration from:', path);
     const file = readFileSync(path, 'utf-8');
     return JSON.parse(file);
   } catch (error) {

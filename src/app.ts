@@ -55,22 +55,22 @@ const update = (
   if (listener.filters) {
     const { username, email, name } = listener.filters;
     if (
-      (username && username !== payload.pusher.username) ||
-      (email && email !== payload.pusher.email) ||
-      (name && name !== payload.pusher.name)
+      (username && username !== payload.pusher?.username) ||
+      (email && email !== payload.pusher?.email) ||
+      (name && name !== payload.pusher?.name)
     ) {
       console.log('Pusher is not allowed:', payload.pusher);
       return forbidden(reply);
     }
   }
-  if (listener.branch && listener.branch !== payload.ref.split('/').pop()) {
+  if (listener.branch && listener.branch !== payload.ref?.split('/').pop()) {
     console.log('Branch is not allowed:', payload.ref);
     return forbidden(reply);
   }
   if (
     listener.commitFlag &&
-    !payload.commits.some((commit) =>
-      commit.message.includes(listener.commitFlag)
+    !payload.commits?.some((commit) =>
+      commit.message.includes(listener.commitFlag as string)
     )
   ) {
     console.log('Commit flag not found:', listener.commitFlag);

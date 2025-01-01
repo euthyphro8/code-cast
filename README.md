@@ -2,6 +2,8 @@
 
 An application that can be used to cast (listen) for github webhooks in order to build and update a SPA.
 
+I'm aware there are a million far more elegant solutions to this particular problem, however, I wanted to build something custom. Both for the experience as well as a sort of precursor to another project I intend to work on that would benefit from utilizing the same type of technique.
+
 ## Motivation
 
 This application is originally designed for the usecase of hosting several applications on a single server in active(ish) developement. The server being used reverse proxies to each of the applications, most of which are SPAs. Thus the application need only build and copy the static files to the location being served by nginx. However, it's designed to be flexible enough to run any cli command needed to build said application and then copy the output wherever it's needed.
@@ -29,10 +31,7 @@ The application will look for the config file at the environment variable `CC_CO
       "repository": "repo-name", // The name of the repository, this is so you can listen to an arbitrary amount of webhooks
       "branch": "master", // Optional: only runs if the commit is found on the given branch
       "commitFlag": "[deploy]", // Optional: only runs if this string is found in the commit message
-      "dist": {
-        "in": "dist", // The folder the app will look for build files
-        "out": "app-output-dir" // Will copy contents of `in` here
-      },
+      "dist": "dist", // The folder the build artificats will exist in
       "strategy": {
         "type": "custom", // Or default to simply run `npm run build`.
         "script": "npm run build" // This will get ran in a child process, can be any cli

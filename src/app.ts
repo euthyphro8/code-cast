@@ -104,13 +104,14 @@ const executeDefaultStrategy = async (
   console.log('Pulled from remote:\n', pullOut);
 
   console.log(`${COLORS.BgBlue}Resolving deps...${COLORS.Reset}`);
-  const { stdout: installOut, stderr: installError } = await exec(
-    `npm run install`,
-    {
-      cwd: `${repoDir}/${repoName}`,
-    }
-  ).catch((r) => r);
-  if (installError) {
+  const {
+    stdout: installOut,
+    stderr: installError,
+    exitCode: installExitCode,
+  } = await exec(`npm run install`, {
+    cwd: `${repoDir}/${repoName}`,
+  }).catch((r) => r);
+  if (installError && installExitCode !== 0) {
     console.error(
       'Error installing deps:\n',
       COLORS.BgRed,
@@ -124,10 +125,14 @@ const executeDefaultStrategy = async (
   }
 
   console.log(`${COLORS.BgBlue}Building application...${COLORS.Reset}`);
-  const { stdout: buildOut, stderr: buildError } = await exec(`npm run build`, {
+  const {
+    stdout: buildOut,
+    stderr: buildError,
+    exitCode: buildExitCode,
+  } = await exec(`npm run build`, {
     cwd: `${repoDir}/${repoName}`,
   }).catch((r) => r);
-  if (buildError) {
+  if (buildError && buildExitCode !== 0) {
     console.error(
       'Error building application:\n',
       COLORS.BgRed,

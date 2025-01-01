@@ -7,7 +7,6 @@ import { FastifyPluginAsync, FastifyReply } from 'fastify';
 import sensible from '@fastify/sensible';
 import rateLimit from '@fastify/rate-limit';
 import { PushEventPayload, UpdateConfig, UpdateListener } from './types';
-
 const exec = promisify(child_process.exec);
 
 const app: FastifyPluginAsync = async (fastify): Promise<void> => {
@@ -62,34 +61,57 @@ const executeDefaultStrategy = async (
   branch: string,
   distConfig: { in: string; out: string }
 ) => {
-  const { stderr: cdError } = await exec(`cd ${distConfig.in}/..`);
-  if (cdError) {
-    console.error('Error changing directory:', cdError);
-    throw new Error('Error changing directory, server may be misconfigured');
-  }
-  const { stdout: branchOut } = await exec(`git rev-parse --abbrev-ref HEAD`);
+  console.log(`${COLORS.BgBlue}Verifying correct branch...${COLORS.Reset}`);
+  const { stdout: branchOut, stderr: branchError } = await exec(
+    `git rev-parse --abbrev-ref HEAD`,
+    { cwd: `${distConfig.in}/..` }
+  ).catch((r) => r);
   if (branchOut.trim().toLowerCase() !== branch.trim().toLowerCase()) {
     console.log('Branch mismatch, skipping update');
     console.log(`Receieved: ${branchOut}. Expected: ${branch}`);
+    if (branchError) {
+      console.log(branchError);
+    }
     throw new Error('Branch mismatch, server may be misconfigured');
   }
-  const { stderr: pullError } = await exec(`git pull`);
+  console.log('Branch matched:', branchOut);
+
+  console.log(`${COLORS.BgBlue}Pulling from remote...${COLORS.Reset}`);
+  const { stdout: pullOut, stderr: pullError } = await exec(`git pull`, {
+    cwd: `${distConfig.in}/..`,
+  }).catch((r) => r);
   if (pullError) {
     console.error('Error pulling from remote:', pullError);
     throw new Error('Error pulling from remote, server may be misconfigured');
   }
-  const { stderr: buildError } = await exec(`npm run build`);
+  console.log('Pulled from remote:', pullOut);
+
+  console.log(`${COLORS.BgBlue}Building application...${COLORS.Reset}`);
+  const { stdout: buildOut, stderr: buildError } = await exec(`npm run build`, {
+    cwd: `${distConfig.in}/..`,
+  }).catch((r) => r);
   if (buildError) {
     console.error('Error building application:', buildError);
     throw new Error('Error building application, server may be misconfigured');
   }
-  const { stderr: mvError } = await exec(
-    `mv ${distConfig.in}/* ${distConfig.out}`
-  );
+  if (buildOut) {
+    console.log('Build output:', buildOut);
+  }
+
+  console.log(`${COLORS.BgBlue}Moving files to dist...${COLORS.Reset}`);
+  const { stdout: mvOut, stderr: mvError } = await exec(
+    `mv ${distConfig.in}/* ${distConfig.out}`,
+    { cwd: `${distConfig.in}/..` }
+  ).catch((r) => r);
+  if (mvOut) {
+    console.log('Moved files:', mvOut);
+  }
   if (mvError) {
     console.error('Error moving files:', mvError);
     throw new Error('Error moving files, server may be misconfigured');
   }
+
+  console.log(`${COLORS.FgGreen}Default strategy successfull!${COLORS.Reset}`);
 };
 
 const filter = (listener: UpdateListener, payload: PushEventPayload) => {
@@ -141,6 +163,34 @@ const forbidden = (reply: FastifyReply) => {
     .send(
       `<html lang="en"><div id="app"><div>403</div><div class="txt">Forbidden<span class="blink">_</span></div></div><style>@import url(https://fonts.googleapis.com/css?family=Press+Start+2P);body,html{width:100%;height:100%;margin:0}*{font-family:"Press Start 2P",cursive;box-sizing:border-box}#app{padding:1rem;background:#000;display:flex;height:100%;justify-content:center;align-items:center;color:#54fe55;text-shadow:0 0 10px;font-size:6rem;flex-direction:column}#app .txt{font-size:1.8rem}@keyframes blink{0%{opacity:0}49%{opacity:0}50%{opacity:1}100%{opacity:1}}.blink{animation-name:blink;animation-duration:1s;animation-iteration-count:infinite}</style></html>`
     );
+};
+
+const COLORS = {
+  Reset: '\x1b[0m',
+  Bright: '\x1b[1m',
+  Dim: '\x1b[2m',
+  Underscore: '\x1b[4m',
+  Blink: '\x1b[5m',
+  Reverse: '\x1b[7m',
+  Hidden: '\x1b[8m',
+  FgBlack: '\x1b[30m',
+  FgRed: '\x1b[31m',
+  FgGreen: '\x1b[32m',
+  FgYellow: '\x1b[33m',
+  FgBlue: '\x1b[34m',
+  FgMagenta: '\x1b[35m',
+  FgCyan: '\x1b[36m',
+  FgWhite: '\x1b[37m',
+  FgGray: '\x1b[90m',
+  BgBlack: '\x1b[40m',
+  BgRed: '\x1b[41m',
+  BgGreen: '\x1b[42m',
+  BgYellow: '\x1b[43m',
+  BgBlue: '\x1b[44m',
+  BgMagenta: '\x1b[45m',
+  BgCyan: '\x1b[46m',
+  BgWhite: '\x1b[47m',
+  BgGray: '\x1b[100m',
 };
 
 export default app;

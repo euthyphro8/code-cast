@@ -91,10 +91,16 @@ const executeDefaultStrategy = async (
   console.log('Branch matched:', branchOut);
 
   console.log(`${COLORS.BgBlue}Pulling from remote...${COLORS.Reset}`);
-  const { stdout: pullOut, stderr: pullError } = await exec(`git pull`, {
-    cwd: `${repoDir}/${repoName}`,
-  }).catch((r) => r);
-  if (pullError) {
+  const { stdout: pullOut, stderr: pullError } = await exec(
+    `git pull && echo $?`,
+    {
+      cwd: `${repoDir}/${repoName}`,
+    }
+  ).catch((r) => r);
+  // Last character should be newline and second to last will be the error code per the command
+  const pullExitCode = parseInt(pullOut[pullOut.length - 2]);
+  console.log('Exit code:', pullExitCode);
+  if (pullError && pullExitCode !== 0) {
     console.error(
       'Error pulling from remote:\n',
       COLORS.BgRed,
@@ -128,9 +134,12 @@ const executeDefaultStrategy = async (
   }
 
   console.log(`${COLORS.BgBlue}Building application...${COLORS.Reset}`);
-  const { stdout: buildOut, stderr: buildError } = await exec(`npm run build && echo $?`, {
-    cwd: `${repoDir}/${repoName}`,
-  }).catch((r) => r);
+  const { stdout: buildOut, stderr: buildError } = await exec(
+    `npm run build && echo $?`,
+    {
+      cwd: `${repoDir}/${repoName}`,
+    }
+  ).catch((r) => r);
   const buildExitCode = parseInt(buildOut[buildOut.length - 2]);
   console.log('Exit code:', buildExitCode);
   if (buildError && buildExitCode !== 0) {

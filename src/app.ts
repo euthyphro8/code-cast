@@ -50,15 +50,17 @@ const app: FastifyPluginAsync = async (fastify): Promise<void> => {
     }
     console.log('All filters passed, updating application:');
     if (listener.strategy.type === 'default') {
-      return executeDefaultStrategy(
+      reply.status(200).send('Attempting to deploy changes to application.');
+      await executeDefaultStrategy(
         listener.repository,
         listener.branch,
         listener.dist,
         config.reposDirectory,
         config.serveDirectory
       );
+    } else {
+      return reply.status(501).send();
     }
-    return reply.status(501).send();
   });
 };
 
@@ -105,12 +107,12 @@ const executeDefaultStrategy = async (
 
   console.log(`${COLORS.BgBlue}Resolving deps...${COLORS.Reset}`);
   const { stdout: installOut, stderr: installError } = await exec(
-    `npm run install && echo $?`,
+    `npm install && echo $?`,
     {
       cwd: `${repoDir}/${repoName}`,
     }
   ).catch((r) => r);
-  const installExitCode = parseInt(installOut[installOut.length - 1]);
+  const installExitCode = parseInt(installOut[installOut.length - 2]);
   console.log('Exit code:', installExitCode);
   if (installError && installExitCode !== 0) {
     console.error(
@@ -126,10 +128,10 @@ const executeDefaultStrategy = async (
   }
 
   console.log(`${COLORS.BgBlue}Building application...${COLORS.Reset}`);
-  const { stdout: buildOut, stderr: buildError } = await exec(`npm run build`, {
+  const { stdout: buildOut, stderr: buildError } = await exec(`npm run build && echo $?`, {
     cwd: `${repoDir}/${repoName}`,
   }).catch((r) => r);
-  const buildExitCode = parseInt(buildOut[buildOut.length - 1]);
+  const buildExitCode = parseInt(buildOut[buildOut.length - 2]);
   console.log('Exit code:', buildExitCode);
   if (buildError && buildExitCode !== 0) {
     console.error(
@@ -145,11 +147,12 @@ const executeDefaultStrategy = async (
   }
 
   console.log(`${COLORS.BgBlue}Moving files to dist...${COLORS.Reset}`);
+  console.log(`mv -f ${repoDir}/${repoName}/${dist}/* ${serveDir}/${repoName}`);
   const { stdout: mvOut, stderr: mvError } = await exec(
-    `mv ${repoDir}/${repoName}/${dist}/* ${serveDir}/${repoName}`
+    `rsync -av ${repoDir}/${repoName}/${dist}/* ${serveDir}/${repoName}`
   ).catch((r) => r);
   if (mvOut) {
-    console.log('Moved files:', mvOut);
+    console.log(mvOut);
   }
   if (mvError) {
     console.error('Error moving files:', mvError);

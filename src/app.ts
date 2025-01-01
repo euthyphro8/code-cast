@@ -50,7 +50,6 @@ const app: FastifyPluginAsync = async (fastify): Promise<void> => {
     }
     console.log('All filters passed, updating application:');
     if (listener.strategy.type === 'default') {
-      console.log('Using default strategy');
       return executeDefaultStrategy(
         listener.repository,
         listener.branch,
@@ -70,6 +69,10 @@ const executeDefaultStrategy = async (
   repoDir: string,
   serveDir: string
 ) => {
+  console.log(
+    `${COLORS.BgWhite}${COLORS.FgBlue}Initiating default strategy...${COLORS.Reset}`
+  );
+
   console.log(`${COLORS.BgBlue}Verifying correct branch...${COLORS.Reset}`);
   const { stdout: branchOut, stderr: branchError } = await exec(
     `git rev-parse --abbrev-ref HEAD`,
@@ -90,21 +93,51 @@ const executeDefaultStrategy = async (
     cwd: `${repoDir}/${repoName}`,
   }).catch((r) => r);
   if (pullError) {
-    console.error('Error pulling from remote:', pullError);
+    console.error(
+      'Error pulling from remote:\n',
+      COLORS.BgRed,
+      pullError,
+      COLORS.Reset
+    );
     throw new Error('Error pulling from remote, server may be misconfigured');
   }
-  console.log('Pulled from remote:', pullOut);
+  console.log('Pulled from remote:\n', pullOut);
+
+  console.log(`${COLORS.BgBlue}Resolving deps...${COLORS.Reset}`);
+  const { stdout: installOut, stderr: installError } = await exec(
+    `npm run install`,
+    {
+      cwd: `${repoDir}/${repoName}`,
+    }
+  ).catch((r) => r);
+  if (installError) {
+    console.error(
+      'Error installing deps:\n',
+      COLORS.BgRed,
+      installError,
+      COLORS.Reset
+    );
+    throw new Error('Error installing deps, server may be misconfigured');
+  }
+  if (installOut) {
+    console.log('Install output:\n', installOut);
+  }
 
   console.log(`${COLORS.BgBlue}Building application...${COLORS.Reset}`);
   const { stdout: buildOut, stderr: buildError } = await exec(`npm run build`, {
     cwd: `${repoDir}/${repoName}`,
   }).catch((r) => r);
   if (buildError) {
-    console.error('Error building application:', buildError);
+    console.error(
+      'Error building application:\n',
+      COLORS.BgRed,
+      buildError,
+      COLORS.Reset
+    );
     throw new Error('Error building application, server may be misconfigured');
   }
   if (buildOut) {
-    console.log('Build output:', buildOut);
+    console.log('Build output:\n', buildOut);
   }
 
   console.log(`${COLORS.BgBlue}Moving files to dist...${COLORS.Reset}`);
@@ -119,7 +152,9 @@ const executeDefaultStrategy = async (
     throw new Error('Error moving files, server may be misconfigured');
   }
 
-  console.log(`${COLORS.FgGreen}Default strategy successfull!${COLORS.Reset}`);
+  console.log(
+    `${COLORS.FgGreen}${COLORS.BgWhite}Default strategy successfull!${COLORS.Reset}`
+  );
 };
 
 const filter = (listener: UpdateListener, payload: PushEventPayload) => {

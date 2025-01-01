@@ -1,5 +1,6 @@
 export interface UpdateConfig {
-  serveDirectory?: string;
+  serveDirectory: string;
+  reposDirectory: string;
   listeners: UpdateListener[];
 }
 
@@ -10,12 +11,9 @@ export interface UpdateListener {
     username?: string;
   };
   repository: string;
-  branch?: string;
+  branch: string;
   commitFlag?: string;
-  dist: {
-    in: string;
-    out: string;
-  };
+  dist: string;
   strategy: {
     type: 'default' | 'custom';
     script?: string;

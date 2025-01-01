@@ -51,20 +51,29 @@ const app: FastifyPluginAsync = async (fastify): Promise<void> => {
     console.log('All filters passed, updating application:');
     if (listener.strategy.type === 'default') {
       console.log('Using default strategy');
-      return executeDefaultStrategy(listener.branch!, listener.dist);
+      return executeDefaultStrategy(
+        listener.repository,
+        listener.branch,
+        listener.dist,
+        config.reposDirectory,
+        config.serveDirectory
+      );
     }
     return reply.status(501).send();
   });
 };
 
 const executeDefaultStrategy = async (
+  repoName: string,
   branch: string,
-  distConfig: { in: string; out: string }
+  dist: string,
+  repoDir: string,
+  serveDir: string
 ) => {
   console.log(`${COLORS.BgBlue}Verifying correct branch...${COLORS.Reset}`);
   const { stdout: branchOut, stderr: branchError } = await exec(
     `git rev-parse --abbrev-ref HEAD`,
-    { cwd: `${distConfig.in}/..` }
+    { cwd: `${repoDir}/${repoName}` }
   ).catch((r) => r);
   if (branchOut.trim().toLowerCase() !== branch.trim().toLowerCase()) {
     console.log('Branch mismatch, skipping update');
@@ -78,7 +87,7 @@ const executeDefaultStrategy = async (
 
   console.log(`${COLORS.BgBlue}Pulling from remote...${COLORS.Reset}`);
   const { stdout: pullOut, stderr: pullError } = await exec(`git pull`, {
-    cwd: `${distConfig.in}/..`,
+    cwd: `${repoDir}/${repoName}`,
   }).catch((r) => r);
   if (pullError) {
     console.error('Error pulling from remote:', pullError);
@@ -88,7 +97,7 @@ const executeDefaultStrategy = async (
 
   console.log(`${COLORS.BgBlue}Building application...${COLORS.Reset}`);
   const { stdout: buildOut, stderr: buildError } = await exec(`npm run build`, {
-    cwd: `${distConfig.in}/..`,
+    cwd: `${repoDir}/${repoName}`,
   }).catch((r) => r);
   if (buildError) {
     console.error('Error building application:', buildError);
@@ -100,8 +109,7 @@ const executeDefaultStrategy = async (
 
   console.log(`${COLORS.BgBlue}Moving files to dist...${COLORS.Reset}`);
   const { stdout: mvOut, stderr: mvError } = await exec(
-    `mv ${distConfig.in}/* ${distConfig.out}`,
-    { cwd: `${distConfig.in}/..` }
+    `mv ${repoDir}/${repoName}/${dist}/* ${serveDir}/${repoName}`
   ).catch((r) => r);
   if (mvOut) {
     console.log('Moved files:', mvOut);
